@@ -216,9 +216,18 @@
             z-index: 1;
             pointer-events: none;
         }
-        .book-wrapper:hover .book-cover {
-            transform: rotateY(-72deg);
-            box-shadow: 12px 4px 40px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.35);
+        @media (hover: hover) and (pointer: fine) {
+            .book-wrapper:hover .book-cover {
+                transform: rotateY(-72deg);
+                box-shadow: 12px 4px 40px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.35);
+            }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            .book-wrapper.book-open-mobile .book-cover {
+                transform: rotateY(-72deg);
+                box-shadow: 12px 4px 40px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.35);
+            }
         }
 
         /* Indication d'interaction sur les vignettes de la galerie */
@@ -274,7 +283,9 @@
     <div class="relative z-20">
         
         <nav class="p-6 flex justify-between items-center border-b border-white/5 backdrop-blur-lg sticky top-0 z-50">
-            <div class="text-xl font-bold tracking-widest uppercase italic gradient-text">OnchAInfinity</div>
+            <a href="https://onchainfinity.art" target="_blank" rel="noopener noreferrer" class="text-xl font-bold tracking-widest uppercase italic gradient-text">
+                OnchAInfinity
+            </a>
             <div class="hidden md:flex space-x-10 text-[10px] uppercase tracking-[0.3em] mono">
                 <a href="#ulysse" class="hover:text-blue-400 transition">Le Récit</a>
                 <a href="#public" class="hover:text-blue-400 transition">Pour qui ?</a>
@@ -450,7 +461,7 @@
         </section>
 
         <footer class="py-14 md:py-20 px-6 border-t border-white/5 text-center opacity-40 text-[9px] mono tracking-[0.6em] uppercase">
-            <p class="mb-4">© 2026 OnchAInfinity — Tissé dans la Trame Invisible</p>
+            <p class="mb-4">© 2026 <a href="https://onchainfinity.art" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-300">OnchAInfinity</a> — Tissé dans la Trame Invisible</p>
             <p>ISBN 978-2-9701985-1-2</p>
         </footer>
     </div>
@@ -499,6 +510,24 @@
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && lb.classList.contains('active')) closeLightbox();
             });
+        })();
+
+        // Mobile tap to open/close the book cover
+        (function() {
+            var wrapper = document.querySelector('.book-wrapper');
+            if (!wrapper) return;
+
+            function toggleBook(e) {
+                // Only on coarse pointer devices (mobile/tablette)
+                if (window.matchMedia && !window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+                    return;
+                }
+                e.preventDefault();
+                wrapper.classList.toggle('book-open-mobile');
+            }
+
+            wrapper.addEventListener('click', toggleBook);
+            wrapper.addEventListener('touchend', toggleBook);
         })();
 
         (function() {
