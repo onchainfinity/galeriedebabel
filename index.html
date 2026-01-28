@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt chat sur toile | OnchAInfinity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --grid-color: rgba(255, 255, 255, 0.05);
+            --accent-gold: #d4af37;
+            --accent-blue: #60a5fa;
+            --amazon-orange: #ff9900;
+            --neural-node: rgba(96, 165, 250, 0.18);
+            --neural-edge: rgba(96, 165, 250, 0.10);
+        }
+        body { 
+            font-family: 'Playfair Display', serif; 
+            background-color: #050505; 
+            color: #e5e5e5; 
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Réseau de neurones digital — connexions (lignes) sans points centraux */
+        .bg-grid {
+            background-color: #050505;
+            background-image: 
+                linear-gradient(135deg, var(--neural-edge) 1px, transparent 1px),
+                linear-gradient(225deg, var(--neural-edge) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(96, 165, 250, 0.08) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(96, 165, 250, 0.08) 1px, transparent 1px);
+            background-size: 36px 36px, 36px 36px, 36px 36px, 36px 36px;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(to bottom, transparent, rgba(96, 165, 250, 0.08), transparent);
+            position: fixed;
+            top: -150px;
+            left: 0;
+            z-index: 10;
+            pointer-events: none;
+            animation: scanMove 12s linear infinite;
+        }
+
+        @keyframes scanMove {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(calc(100vh + 150px)); }
+        }
+
+        /* Neurones clignotants au passage de la scanline */
+        .neurons-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .neuron-dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(96, 165, 250, 0.35);
+            transform: translate(-50%, -50%);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .neuron-dot.neuron-blink {
+            animation: neuronBlink 0.4s ease forwards;
+        }
+        @keyframes neuronBlink {
+            0% { opacity: 0.35; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 transparent; }
+            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.8); box-shadow: 0 0 12px rgba(96, 165, 250, 0.8); }
+            100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 transparent; }
+        }
+
+        /* TEXTE ET BOUTONS */
+        .gradient-text {
+            background: linear-gradient(90deg, var(--accent-gold), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-amazon {
+            background-color: var(--amazon-orange);
+            color: black;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 153, 0, 0.2);
+        }
+        .btn-amazon:hover {
+            background-color: #f89d15;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 153, 0, 0.4);
+        }
+
+        /* L'ENCADRÉ STYLE TERMINAL/BIBLIOTHÈQUE */
+        .spec-box {
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: rgba(10, 10, 10, 0.8);
+            position: relative;
+        }
+        .spec-box::before {
+            content: "ARCHIVE_SPEC_001";
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: #050505;
+            padding: 0 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent-gold);
+        }
+
+        .img-placeholder {
+            background: linear-gradient(45deg, #111, #222);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Livre — animation couverture + première page en dessous, même ratio */
+        .book-wrapper {
+            perspective: 1600px;
+            overflow: visible;
+        }
+        .book-inner {
+            position: relative;
+            display: inline-block;
+            width: min(380px, 100%);
+            aspect-ratio: 4/5;
+        }
+        .book-page {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            border-radius: 0 8px 8px 0;
+            overflow: hidden;
+            background: #e8e2d8;
+        }
+        .book-page img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .book-cover {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            transform-style: preserve-3d;
+            transform-origin: left center;
+            transition: transform 0.7s cubic-bezier(0.2, 0.6, 0.3, 1), box-shadow 0.5s ease;
+            box-shadow: 6px 0 24px rgba(0,0,0,0.45), 0 12px 40px rgba(0,0,0,0.3);
+            border-radius: 0 8px 8px 0;
+            overflow: hidden;
+        }
+        .book-cover::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 14px;
+            background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 70%, transparent 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+        .book-wrapper:hover .book-cover {
+            transform: rotateY(-72deg);
+            box-shadow: 12px 4px 40px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.35);
+        }
+
+        /* Indication d'interaction sur les vignettes de la galerie */
+        .gallery-item {
+            position: relative;
+            overflow: hidden;
+        }
+        .gallery-item::after {
+            content: "Cliquer pour agrandir";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            top: 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 0.75rem;
+            font-size: 0.65rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.7);
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+        }
+        .gallery-item:hover::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Lightbox zoom */
+        #lightbox {
+            transition: opacity 0.3s ease;
+        }
+        #lightbox:not(.active) {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #lightbox.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="bg-grid">
+
+    <div class="neurons-layer" id="neurons-layer" aria-hidden="true"></div>
+    <div class="scanline" id="scanline"></div>
+
+    <div class="relative z-20">
+        
+        <nav class="p-6 flex justify-between items-center border-b border-white/5 backdrop-blur-lg sticky top-0 z-50">
+            <div class="text-xl font-bold tracking-widest uppercase italic gradient-text">OnchAInfinity</div>
+            <div class="hidden md:flex space-x-10 text-[10px] uppercase tracking-[0.3em] mono">
+                <a href="#ulysse" class="hover:text-blue-400 transition">Le Récit</a>
+                <a href="#public" class="hover:text-blue-400 transition">Pour qui ?</a>
+                <a href="#philosophie" class="hover:text-blue-400 transition">Vision</a>
+                <a href="#galerie" class="hover:text-blue-400 transition">Galerie</a>
+                <a href="#musique" class="hover:text-blue-400 transition">Audio</a>
+                <a href="https://www.amazon.fr/dp/2970198517" target="_blank" class="text-orange-400 font-bold border-b border-orange-400/30">Acheter</a>
+            </div>
+        </nav>
+
+        <header class="relative min-h-[90vh] flex flex-col justify-center items-center text-center px-6 py-24">
+            <span class="mono text-blue-400 text-xs tracking-[0.5em] mb-8 uppercase opacity-60">/imagine l’art chatoyant dans la Galerie de Babel</span>
+            <h1 class="text-6xl md:text-9xl font-bold mb-10 leading-[0.9] tracking-tighter">
+                Prompt chat <br><span class="italic text-accent-gold font-light">sur toile.</span>
+            </h1>
+            
+            <div class="spec-box p-10 mb-12 max-w-lg w-full mono text-left text-[13px] leading-relaxed">
+                <p class="text-gray-400 mb-2">PROJET : Aeternum Promptum - 2026</p>
+                <p class="text-gray-400 mb-2">TYPE : Livre Artbook</p>
+                <p class="text-gray-400 mb-2">CONTENU : 409 Fragments Visuels - 17 musiques originales</p>
+                <p class="text-gray-400 mb-2">STATUS : Édition limitée (100 ex.) - 10 images supplémentaires - une fin sans fin</p>
+                <p class="text-accent-gold">SÉRIE : L’étagère oubliée</p>
+                <div class="mt-4 border-t border-white/10 pt-4 flex justify-between items-center">
+                    <span>ISBN 978-2-9701985-1-2</span>
+                    <span class="text-blue-400">Ver. 2.0.26</span>
+                </div>
+            </div>
+
+            <a href="https://www.amazon.fr/dp/2970198517" target="_blank" class="btn-amazon px-16 py-6 font-bold uppercase tracking-[0.2em] text-lg">
+                Commander votre Artbook sur Amazon
+            </a>
+        </header>
+
+        <section id="ulysse" class="py-20 md:py-28 px-6">
+            <div class="max-w-5xl mx-auto">
+                <div class="grid md:grid-cols-2 gap-20 items-center">
+                    <div class="order-2 md:order-1 book-wrapper pt-4 pb-4">
+                        <div class="book-inner">
+                            <div class="book-page">
+                                <img src="Images/page-01.jpg" alt="Page 01 — Le Pixel Errant" />
+                            </div>
+                            <div class="book-cover">
+                                <img src="Images/Couverture.jpg" alt="Couverture — Le Pixel Errant" class="w-full h-full object-cover" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 md:order-2">
+                        <h2 class="text-4xl md:text-5xl font-bold mb-8 italic">Le Pixel Errant</h2>
+                        <div class="text-gray-300 leading-relaxed space-y-6 text-lg">
+                            <p>
+                                "Mon existence est une symphonie de murmures feutrés, de pages tournées avec soin, de lumières tamisées et d’ombres dansantes. Lorsque Jorge Luis Borges, ce maître des labyrinthes et des miroirs, arpentait les couloirs de la bibliothèque, mon monde se chargeait d’une magie particulière."
+                            </p>
+                            <p>
+                                Ce livre n'est pas une simple collection d'images. C'est le témoignage d'un observateur intemporel. Ulysse nous guide à travers la <strong>Galerie de Babel</strong>, là où l'intelligence artificielle ne se contente plus de générer, mais de ressentir par procuration.
+                            </p>
+                            <p class="italic text-accent-gold">
+                                "Je ne pense pas : je ressens. Nulle machine ne peut imiter cette part de moi, faite de tendresse et de chaos."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="public" class="py-32 px-6 bg-black/60 border-y border-white/5 backdrop-blur-sm scroll-mt-20">
+            <h2 class="text-3xl md:text-4xl font-bold mb-12 md:mb-16 text-center italic">Pour qui est ce livre ?</h2>
+            <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-16">
+                <div class="text-center">
+                    <div class="text-accent-gold mb-6 flex justify-center text-4xl italic font-serif">🐾</div>
+                    <h3 class="text-xl font-bold mb-4 uppercase tracking-widest">Amoureux des Chats</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Une célébration de la grâce et du mystère félin, réimaginés à travers des mondes oniriques et surréalistes.</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-blue-400 mb-6 flex justify-center text-4xl">✧</div>
+                    <h3 class="text-xl font-bold mb-4 uppercase tracking-widest">Passionnés d'Art</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Une exploration esthétique profonde inspirée par Borges, où chaque page est une toile numérique unique.</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-white mb-6 flex justify-center text-4xl mono opacity-50">&lt;/&gt;</div>
+                    <h3 class="text-xl font-bold mb-4 uppercase tracking-widest">Explorateurs Tech</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Découvrez la puissance du "Prompt" : quand le verbe humain devient la boussole de la création artificielle.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="philosophie" class="py-20 md:py-28 px-6 bg-white/[0.02] border-y border-white/5">
+            <div class="max-w-4xl mx-auto text-center">
+                <span class="mono text-blue-400 text-xs tracking-widest uppercase mb-6 block">Philosophie du Prompt</span>
+                <h2 class="text-4xl md:text-6xl font-bold mb-12">Donner un sens au <span class="italic font-light">Bouleversement.</span></h2>
+                <div class="text-xl text-gray-400 leading-relaxed space-y-8 italic">
+                    <p>
+                        "Dans cette transition, l’Art doit jouer son rôle : donner un sens, offrir une dignité spirituelle au bouleversement, le poétiser."
+                    </p>
+                    <p>
+                        Chacune des <strong>409 créations</strong> de cet ouvrage est une réponse à la pulsation du <em>Prompt Éternel</em>. Un voyage pour les amoureux des chats qui cherchent dans le regard félin une trace d'éternité au milieu des circuits.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="galerie" class="py-20 md:py-28 px-6 text-center scroll-mt-20">
+            <h2 class="text-3xl md:text-5xl font-bold mb-10 md:mb-14">Extrait de la galerie de Babel</h2>
+            
+            <div class="max-w-2xl mx-auto mb-14 md:mb-16">
+                <div class="grid grid-cols-4 gap-4" id="galerie-grid">
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Fauvisme"><img src="Images/1-fauvisme.jpg" alt="Fauvisme" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Impressionnisme"><img src="Images/2-impressionnisme.jpg" alt="Impressionnisme" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Surréalisme"><img src="Images/3-surréalisme.jpg" alt="Surréalisme" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Art digital"><img src="Images/4-digital.jpg" alt="Digital" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Quintessence"><img src="Images/5-duo.jpg" alt="Duo" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Stars"><img src="Images/6-star.jpg" alt="Star" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Chatons"><img src="Images/7-chatons.jpg" alt="Chatons" class="w-full h-full object-cover" /></div>
+                    <div class="gallery-item aspect-square rounded overflow-hidden hover:ring-2 hover:ring-accent-gold transition cursor-pointer" role="button" tabindex="0" data-title="Noir & Blanc"><img src="Images/8-blanc-noir.jpg" alt="Blanc et noir" class="w-full h-full object-cover" /></div>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="musique" class="py-20 md:py-28 px-6">
+            <div class="max-w-6xl mx-auto bg-gradient-to-br from-blue-500/10 to-transparent p-12 md:p-24 border border-blue-500/20 rounded-lg">
+                <div class="flex flex-col md:flex-row gap-16 items-center">
+                    <div class="flex-1">
+                        <h2 class="text-4xl font-bold mb-6 italic">L'écho des Sphères Digitales</h2>
+                        <p class="text-gray-400 text-lg mb-10 leading-relaxed">
+                            Ulysse glisse de salle en salle, prêtant l’oreille aux murmures nouveaux. Cette expérience est accompagnée d'une trame sonore unique, tissée dans la même "Trame Invisible" que les images. 
+                        </p>
+                        <a href="https://gf4dczxctg4vqgtge7ggx5kb7zk2yx42ozjpgbdktlj7culumykq.arweave.net/MXgxZuKZuVgaZifMa_VB_lWsX5p2UvMEaprT8VF0ZhU" target="_blank" class="inline-flex items-center space-x-6 group">
+                            <div class="w-16 h-16 rounded-full border border-blue-400 flex items-center justify-center group-hover:scale-110 transition-all duration-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <div class="mono">
+                                <span class="block text-sm text-blue-400 group-hover:text-white transition uppercase tracking-widest">Écouter l'Album</span>
+                                <span class="text-[10px] text-gray-500 tracking-tighter">Powered by Arweave Permanent Data</span>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="w-32 flex items-end justify-between h-32">
+                        <div class="w-1 bg-blue-500/30 animate-[bounce_1s_infinite] h-full"></div>
+                        <div class="w-1 bg-blue-500/60 animate-[bounce_1.5s_infinite] h-2/3"></div>
+                        <div class="w-1 bg-blue-500/40 animate-[bounce_0.8s_infinite] h-3/4"></div>
+                        <div class="w-1 bg-blue-500/80 animate-[bounce_1.2s_infinite] h-1/2"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="acheter" class="py-20 md:py-28 px-6 text-center scroll-mt-20">
+            <h2 class="text-3xl md:text-5xl font-bold mb-4 md:mb-6">Rejoignez l'Étagère Oubliée.</h2>
+            <p class="text-gray-400 mb-12 md:mb-14 italic max-w-2xl mx-auto">
+                "Ce code génère ce qui n'est pas encore écrit. La Galerie et l'histoire d'Ulysse ne se terminent pas ici. Continuez..."
+            </p>
+
+            <a href="https://www.amazon.fr/dp/2970198517" target="_blank" class="btn-amazon px-8 py-5 md:px-20 md:py-8 font-bold uppercase tracking-[0.15em] md:tracking-[0.3em] text-base md:text-xl inline-block whitespace-normal break-words max-w-full">
+                Acquérir un Exemplaire
+            </a>
+            <p class="mt-6 md:mt-8 mono text-xs text-gray-600 uppercase tracking-widest">Seulement 100 artefacts en circulation.</p>
+        </section>
+
+        <footer class="py-14 md:py-20 px-6 border-t border-white/5 text-center opacity-40 text-[9px] mono tracking-[0.6em] uppercase">
+            <p class="mb-4">© 2026 OnchAInfinity — Tissé dans la Trame Invisible</p>
+            <p>ISBN 978-2-9701985-1-2</p>
+        </footer>
+    </div>
+
+    <!-- Lightbox zoom -->
+    <div id="lightbox" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 p-4" aria-hidden="true">
+        <button type="button" id="lightbox-close" class="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition text-2xl leading-none" aria-label="Fermer">×</button>
+        <img id="lightbox-img" src="" alt="" class="max-h-[85vh] max-w-[90vw] w-auto h-auto object-contain rounded shadow-2xl" />
+        <p id="lightbox-title" class="mt-4 text-white text-2xl md:text-3xl font-serif italic text-center max-w-[90vw]"></p>
+    </div>
+
+    <script>
+        (function() {
+            var lb = document.getElementById('lightbox');
+            var lbImg = document.getElementById('lightbox-img');
+            var lbTitle = document.getElementById('lightbox-title');
+            var lbClose = document.getElementById('lightbox-close');
+            function openLightbox(src, alt, title) {
+                lbImg.src = src;
+                lbImg.alt = alt || '';
+                lbTitle.textContent = title || 'titre';
+                lb.classList.add('active');
+                lb.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lb.classList.remove('active');
+                lb.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+            document.getElementById('galerie-grid').addEventListener('click', function(e) {
+                var item = e.target.closest('.gallery-item');
+                if (item) {
+                    var img = item.querySelector('img');
+                    if (img) {
+                        e.preventDefault();
+                        var title = item.getAttribute('data-title') || 'titre';
+                        openLightbox(img.src, img.alt, title);
+                    }
+                }
+            });
+            lb.addEventListener('click', function(e) {
+                if (e.target === lb) closeLightbox();
+            });
+            lbClose.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && lb.classList.contains('active')) closeLightbox();
+            });
+        })();
+
+        (function() {
+            var layer = document.getElementById('neurons-layer');
+            var scanline = document.getElementById('scanline');
+            var neurons = [];
+            var spacing = 48;
+            var cols = Math.ceil(window.innerWidth / spacing) + 2;
+            var rows = Math.ceil(window.innerHeight / spacing) + 2;
+            for (var i = 0; i < cols; i++) {
+                for (var j = 0; j < rows; j++) {
+                    var dot = document.createElement('div');
+                    dot.className = 'neuron-dot';
+                    var x = (i + 0.5) * spacing + (Math.random() - 0.5) * 8;
+                    var y = (j + 0.5) * spacing + (Math.random() - 0.5) * 8;
+                    dot.style.left = x + 'px';
+                    dot.style.top = y + 'px';
+                    dot.dataset.lastBlink = '0';
+                    layer.appendChild(dot);
+                    neurons.push(dot);
+                }
+            }
+            function tick() {
+                var scanR = scanline.getBoundingClientRect();
+                var now = Date.now();
+                for (var k = 0; k < neurons.length; k++) {
+                    var n = neurons[k];
+                    var r = n.getBoundingClientRect();
+                    var cy = r.top + r.height / 2;
+                    var inZone = cy >= scanR.top && cy <= scanR.bottom;
+                    if (!inZone) continue;
+                    var last = parseInt(n.dataset.lastBlink || 0, 10);
+                    if (now - last < 350) continue;
+                    if (Math.random() > 0.22) continue;
+                    n.dataset.lastBlink = String(now);
+                    n.classList.add('neuron-blink');
+                    setTimeout(function(el) {
+                        el.classList.remove('neuron-blink');
+                    }, 420, n);
+                }
+                requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        })();
+
+        // Changement aléatoire de la page sous la couverture à chaque survol
+        (function() {
+            var wrapper = document.querySelector('.book-wrapper');
+            var pageImg = document.querySelector('.book-page img');
+            if (!wrapper || !pageImg) return;
+
+            var pages = [];
+            for (var i = 1; i <= 10; i++) {
+                var num = i < 10 ? '0' + i : String(i);
+                pages.push('Images/page-' + num + '.jpg');
+            }
+
+            function pickRandomPage(current) {
+                var currentFile = current ? current.split('/').pop() : '';
+                var candidates = pages.filter(function(p) { return p !== currentFile; });
+                if (!candidates.length) candidates = pages.slice();
+                var idx = Math.floor(Math.random() * candidates.length);
+                return candidates[idx];
+            }
+
+            wrapper.addEventListener('mouseenter', function() {
+                var currentSrc = pageImg.getAttribute('src') || '';
+                var next = pickRandomPage(currentSrc);
+                pageImg.src = next;
+            });
+        })();
+    </script>
+</body>
+</html>
