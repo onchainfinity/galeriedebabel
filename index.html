@@ -573,7 +573,7 @@
             requestAnimationFrame(tick);
         })();
 
-        // Changement aléatoire de la page sous la couverture à chaque survol
+        // Changement aléatoire de la page sous la couverture (desktop hover + mobile tap)
         (function() {
             var wrapper = document.querySelector('.book-wrapper');
             var pageImg = document.querySelector('.book-page img');
@@ -594,6 +594,16 @@
             }
 
             wrapper.addEventListener('mouseenter', function() {
+                var currentSrc = pageImg.getAttribute('src') || '';
+                var next = pickRandomPage(currentSrc);
+                pageImg.src = next;
+            });
+
+            // Sur mobile, change aussi la page à chaque tap sur le livre
+            wrapper.addEventListener('click', function() {
+                if (window.matchMedia && !window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+                    return;
+                }
                 var currentSrc = pageImg.getAttribute('src') || '';
                 var next = pickRandomPage(currentSrc);
                 pageImg.src = next;
