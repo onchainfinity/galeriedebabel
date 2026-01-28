@@ -512,24 +512,6 @@
             });
         })();
 
-        // Mobile tap to open/close the book cover
-        (function() {
-            var wrapper = document.querySelector('.book-wrapper');
-            if (!wrapper) return;
-
-            function toggleBook(e) {
-                // Only on coarse pointer devices (mobile/tablette)
-                if (window.matchMedia && !window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
-                    return;
-                }
-                e.preventDefault();
-                wrapper.classList.toggle('book-open-mobile');
-            }
-
-            wrapper.addEventListener('click', toggleBook);
-            wrapper.addEventListener('touchend', toggleBook);
-        })();
-
         (function() {
             var layer = document.getElementById('neurons-layer');
             var scanline = document.getElementById('scanline');
@@ -573,7 +555,7 @@
             requestAnimationFrame(tick);
         })();
 
-        // Changement aléatoire de la page sous la couverture (desktop hover + mobile tap)
+        // Changement aléatoire de la page sous la couverture (desktop hover + mobile tap qui ouvre/ferme)
         (function() {
             var wrapper = document.querySelector('.book-wrapper');
             var pageImg = document.querySelector('.book-page img');
@@ -593,20 +575,26 @@
                 return candidates[idx];
             }
 
+            // Desktop : change la page au survol
             wrapper.addEventListener('mouseenter', function() {
                 var currentSrc = pageImg.getAttribute('src') || '';
                 var next = pickRandomPage(currentSrc);
                 pageImg.src = next;
             });
 
-            // Sur mobile, change aussi la page à chaque tap sur le livre
-            wrapper.addEventListener('click', function() {
+            // Mobile : tap = ouvrir/fermer + changer de page uniquement à l'ouverture
+            wrapper.addEventListener('click', function(e) {
                 if (window.matchMedia && !window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
                     return;
                 }
-                var currentSrc = pageImg.getAttribute('src') || '';
-                var next = pickRandomPage(currentSrc);
-                pageImg.src = next;
+                e.preventDefault();
+                var willOpen = !wrapper.classList.contains('book-open-mobile');
+                wrapper.classList.toggle('book-open-mobile');
+                if (willOpen) {
+                    var currentSrc = pageImg.getAttribute('src') || '';
+                    var next = pickRandomPage(currentSrc);
+                    pageImg.src = next;
+                }
             });
         })();
     </script>
